@@ -14,10 +14,14 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ── 화면 구성 ────────────────────────────────────
-st.title("🏍️ 헬멧 착용 여부 판별기")
-st.write("사진을 업로드하면 GPT-4o Vision으로 헬멧 착용 여부를 알려줍니다.")
+st.title("🛴 킥보드 탑승 헬멧 판별기")
+st.write(
+    "사진을 업로드하면 AI Vision으로 헬멧 착용 여부를 확인하고, 킥보드 탑승 가능 여부를 안내해드립니다."
+)
 
-uploaded_file = st.file_uploader("📸 사진 업로드", type=["png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader(
+    "📸 헬멧 착용 사진을 업로드하세요", type=["png", "jpg", "jpeg"]
+)
 
 if uploaded_file:
     img = Image.open(uploaded_file)
@@ -25,17 +29,17 @@ if uploaded_file:
 
     if st.button("판별 시작"):
         with st.spinner("판별 중… 잠시만 기다려 주세요"):
-            # ── ① 이미지 → data-URL ─────────────────
+            # ── 이미지 → data-URL ─────────────────
             buf = BytesIO()
             img.save(buf, format="PNG")
             data_url = (
                 "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
             )
 
-            # ── ② GPT-4o Vision 호출 ─────────────────
+            # ── GPT-4o Vision 호출 ─────────────────
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",
-                response_format={"type": "json_object"},  # ← 콤마 추가
+                response_format={"type": "json_object"},
                 messages=[
                     {
                         "role": "user",
@@ -44,8 +48,9 @@ if uploaded_file:
                             {
                                 "type": "text",
                                 "text": (
-                                    "이 사진에서 사람이 헬멧을 쓰고 있는지 여부를 "
-                                    'JSON 형식 {"helmet": bool, "confidence": int} 으로만 답해주세요.'
+                                    "이 사진에서 사람이 헬멧을 착용하고 있는지 판단하고, "
+                                    "다음과 같은 JSON 형식으로만 정확히 답해주세요: "
+                                    '{"helmet": true 또는 false, "confidence": 0~100}'
                                 ),
                             },
                         ],
@@ -53,12 +58,18 @@ if uploaded_file:
                 ],
             )
 
-            # ── ③ 결과 파싱 및 출력 ───────────────────
+            # ── 결과 파싱 및 출력 ───────────────────
             try:
                 result = json.loads(resp.choices[0].message.content)
-                if result["helmet"]:
-                    st.success(f"✅ 헬멧 착용 (신뢰도: {result['confidence']}%)")
+                confidence = result.get("confidence", 0)
+
+                if result.get("helmet"):
+                    st.success(
+                        f"✅ 헬멧을 착용했습니다 (신뢰도: {confidence}%)\n\n🛴 킥보드 탑승이 가능합니다."
+                    )
                 else:
-                    st.error(f"❌ 헬멧 미착용 (신뢰도: {result['confidence']}%)")
+                    st.error(
+                        f"❌ 헬멧을 착용하지 않았습니다 (신뢰도: {confidence}%)\n\n🚫 킥보드 탑승이 불가능합니다."
+                    )
             except Exception as e:
                 st.error(f"GPT 응답 파싱 오류: {e}")
